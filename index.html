@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Bill</title>
+<style>
+:root{--bg:#fbf7ef;--ink:#1d2a24;--mut:#66726b;--g:#0f7a4f;--line:#d9d2c3;--card:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#14201a;--ink:#eef3ee;--mut:#9fb0a6;--g:#3ecf8e;--line:#2c3d34;--card:#1b2b23}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,sans-serif;padding:max(20px,env(safe-area-inset-top)) 20px 40px}
+main{max-width:440px;margin:0 auto}
+h1{font:700 28px/1.2 Georgia,serif;margin:24px 0 8px}
+p{color:var(--mut);margin:0 0 20px}
+label{display:block;font-weight:600;margin:16px 0 6px}
+input,textarea{width:100%;padding:13px;font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px}
+input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--g);outline-offset:1px}
+.chk{display:flex;gap:10px;align-items:flex-start;margin-top:18px;font-weight:400}
+.chk input{width:22px;height:22px;margin:2px 0 0;flex:none}
+button{width:100%;margin-top:22px;padding:14px;font:600 17px inherit;background:var(--g);color:#fff;border:0;border-radius:10px;cursor:pointer}
+button.sec{background:none;color:var(--g);border:1.5px solid var(--g);margin-top:10px}
+.cust{display:block;text-align:left;width:100%;margin:8px 0 0;background:var(--card);color:var(--ink);border:1.5px solid var(--line);font-weight:400}
+.cust.on{border-color:var(--g);background:color-mix(in srgb,var(--g) 12%,var(--card))}
+small{color:var(--mut)}
+.msg{margin-top:16px;font-weight:600}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<!-- CUSTOMER VIEW -->
+<section id="cust">
+  <h1 id="shop"></h1>
+  <p>Apna bill seedha WhatsApp pe paane ke liye naam aur number daalein.</p>
+  <label for="n">Naam</label>
+  <input id="n" autocomplete="name" placeholder="Aapka naam">
+  <label for="p">WhatsApp number</label>
+  <input id="p" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel-national" placeholder="10 digit number">
+  <label class="chk"><input type="checkbox" id="o"><span>Mujhe naye items aur offers ke messages bhi bhejein (optional, kabhi bhi rok sakte hain).</span></label>
+  <button id="go">Bill WhatsApp pe bhejein</button>
+  <div class="msg" id="cm" role="status"></div>
+  <p style="margin-top:18px"><small>Aapka number sirf bill bhejne ke liye use hoga. Offers ke liye tick karne par hi promotional message aayenge.</small></p>
+</section>
+
+<!-- ADMIN VIEW (index.html?admin=1) -->
+<section id="adm" class="hide">
+  <h1>Bill bhejein</h1>
+  <label for="k">Admin password</label>
+  <input id="k" type="password" autocomplete="current-password">
+  <button id="load" class="sec">Customers dikhayein</button>
+  <div id="list"></div>
+  <div id="form" class="hide">
+    <label for="it">Items</label>
+    <textarea id="it" rows="3" placeholder="6 steam momos, 1 cold drink"></textarea>
+    <label for="am">Total amount (₹)</label>
+    <input id="am" type="number" inputmode="decimal">
+    <button id="send">Bill save karke WhatsApp kholein</button>
+  </div>
+  <div class="msg" id="am2" role="status"></div>
+</section>
+
+</main>
+<script>
+const CONFIG = {
+  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwzHItkU6K1yQHCNPTQBEk2SanYJEkfykA51qFsqXlMP_RXEFoVmTSl6bWecF0iA0uc9A/exec',
+  SHOP_NAME: 'Meri Dukaan'
+};
+const $ = id => document.getElementById(id);
+const isAdmin = new URLSearchParams(location.search).has('admin');
+$('shop').textContent = CONFIG.SHOP_NAME;
+document.title = CONFIG.SHOP_NAME;
+$(isAdmin ? 'adm' : 'cust').classList.remove('hide');
+if (isAdmin) $('cust').classList.add('hide');
+
+async function post(body) {
+  const r = await fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+  return r.json();
+}
+
+// ---- Customer ----
+$('go').onclick = async () => {
+  const name = $('n').value.trim(), phone = $('p').value.replace(/\D/g, '');
+  const m = $('cm');
+  if (!name) { m.textContent = 'Naam daalein.'; return; }
+  if (!/^[6-9]\d{9}$/.test(phone)) { m.textContent = '10 digit ka sahi mobile number daalein.'; return; }
+  $('go').disabled = true; m.textContent = 'Bhej rahe hain...';
+  try {
+    const r = await post({ action: 'customer', name, phone, offers: $('o').checked });
+    if (!r.ok) throw 0;
+    $('cust').innerHTML = '<h1>Dhanyavaad ' + name.replace(/</g, '') + '!</h1><p>Aapka bill thodi der mein WhatsApp pe aa jayega.</p>';
+  } catch (e) { m.textContent = 'Kuch gadbad hui. Dobara try karein.'; $('go').disabled = false; }
+};
+
+// ---- Admin ----
+let picked = null;
+$('load').onclick = async () => {
+  const key = $('k').value;
+  $('am2').textContent = 'Load ho raha hai...';
+  try {
+    const r = await (await fetch(CONFIG.SCRIPT_URL + '?key=' + encodeURIComponent(key))).json();
+    if (!r.ok) { $('am2').textContent = 'Password galat hai.'; return; }
+    $('am2').textContent = r.list.length ? '' : 'Koi pending customer nahi hai.';
+    $('list').innerHTML = '';
+    r.list.reverse().forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'cust'; b.textContent = c.name + ' · ' + c.phone;
+      b.onclick = () => { picked = c; document.querySelectorAll('.cust').forEach(x => x.classList.remove('on')); b.classList.add('on'); $('form').classList.remove('hide'); };
+      $('list').appendChild(b);
+    });
+  } catch (e) { $('am2').textContent = 'Load nahi hua. SCRIPT_URL check karein.'; }
+};
+
+$('send').onclick = async () => {
+  const items = $('it').value.trim(), amount = $('am').value;
+  if (!picked || !amount) { $('am2').textContent = 'Customer chunein aur amount daalein.'; return; }
+  const text = 'Namaste ' + picked.name + ',\n' + CONFIG.SHOP_NAME + ' se aapka bill:\n' +
+    (items ? items + '\n' : '') + 'Total: ₹' + amount + '\nDhanyavaad, phir aaiyega!';
+  try {
+    await post({ action: 'bill', key: $('k').value, id: picked.id, name: picked.name, phone: picked.phone, items, amount });
+  } catch (e) { $('am2').textContent = 'Save nahi hua, par WhatsApp khul raha hai.'; }
+  window.open('https://wa.me/91' + picked.phone + '?text=' + encodeURIComponent(text), '_blank');
+  $('it').value = ''; $('am').value = ''; $('form').classList.add('hide'); $('load').click();
+};
+</script>
+</body>
+</html>
