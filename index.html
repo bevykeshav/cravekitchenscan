@@ -57,6 +57,7 @@ button.sec{background:#fff;color:var(--red);border:2px solid var(--red)}
 <script>
 const CONFIG = {
   API: 'https://script.google.com/macros/s/AKfycbwxkTBq0UohF9xuiONhwg9vb2U5Z_0mK-h_DijlOaIUmKRShOT0YAv_xomvF-EHE02B7g/exec',
+  SHEET: 'https://script.google.com/macros/s/AKfycbwzHItkU6K1yQHCNPTQBEk2SanYJEkfykA51qFsqXlMP_RXEFoVmTSl6bWecF0iA0uc9A/exec',
   INSTAGRAM: 'https://www.instagram.com/cravekitchen1092026/'
 };
 const $ = id => document.getElementById(id);
@@ -75,13 +76,25 @@ function saveContact(rec) {
   });
 }
 
+// Saves the same customer to the Excel/Google Sheet (Customers tab)
+function saveSheet(name, phone) {
+  return Promise.race([
+    fetch(CONFIG.SHEET, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'customer', name, phone, offers: true }) }).catch(() => {}),
+    new Promise(r => setTimeout(r, 4000))
+  ]);
+}
+
 $('go').onclick = async () => {
   const name = $('n').value.trim(), phone = $('p').value.replace(/\D/g, '');
   const m = $('cm');
   if (!name) { m.textContent = 'Please enter your name.'; return; }
   if (!/^[6-9]\d{9}$/.test(phone)) { m.textContent = 'Please enter a valid 10-digit mobile number.'; return; }
   $('go').disabled = true; m.textContent = 'Opening Instagram...';
-  await saveContact({ id: 'ig' + phone, name, phone, cat: 'ग्राहक', note: 'Instagram QR' });
+  await Promise.all([
+    saveContact({ id: 'ig' + phone, name, phone, cat: 'ग्राहक', note: 'Instagram QR' }),
+    saveSheet(name, phone)
+  ]);
   location.href = CONFIG.INSTAGRAM;
 };
 </script>
