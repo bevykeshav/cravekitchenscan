@@ -56,22 +56,32 @@ button.sec{background:#fff;color:var(--red);border:2px solid var(--red)}
 </main>
 <script>
 const CONFIG = {
-  SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwzHItkU6K1yQHCNPTQBEk2SanYJEkfykA51qFsqXlMP_RXEFoVmTSl6bWecF0iA0uc9A/exec',
+  API: 'https://script.google.com/macros/s/AKfycbwxkTBq0UohF9xuiONhwg9vb2U5Z_0mK-h_DijlOaIUmKRShOT0YAv_xomvF-EHE02B7g/exec',
   INSTAGRAM: 'https://www.instagram.com/cravekitchen1092026/'
 };
 const $ = id => document.getElementById(id);
+
+// Saves the contact to the same Google Sheet your contacts app uses (same method as the app)
+function saveContact(rec) {
+  return new Promise(resolve => {
+    const cb = 'cb' + Date.now() + Math.floor(Math.random() * 1e4);
+    const s = document.createElement('script');
+    const done = () => { clearTimeout(t); delete window[cb]; s.remove(); resolve(); };
+    const t = setTimeout(done, 4000);
+    window[cb] = done;
+    s.onerror = done;
+    s.src = CONFIG.API + '?' + new URLSearchParams({ action: 'save', ...rec, callback: cb });
+    document.head.appendChild(s);
+  });
+}
+
 $('go').onclick = async () => {
   const name = $('n').value.trim(), phone = $('p').value.replace(/\D/g, '');
   const m = $('cm');
   if (!name) { m.textContent = 'Please enter your name.'; return; }
   if (!/^[6-9]\d{9}$/.test(phone)) { m.textContent = 'Please enter a valid 10-digit mobile number.'; return; }
   $('go').disabled = true; m.textContent = 'Opening Instagram...';
-  try {
-    await Promise.race([
-      fetch(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'customer', name, phone, offers: true }) }),
-      new Promise(r => setTimeout(r, 4000))
-    ]);
-  } catch (e) {}
+  await saveContact({ id: 'ig' + phone, name, phone, cat: 'ग्राहक', note: 'Instagram QR' });
   location.href = CONFIG.INSTAGRAM;
 };
 </script>
